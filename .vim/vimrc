@@ -4,13 +4,33 @@ let $RC="$HOME/.vim/vimrc"
 
 set path=.,**
 "copies to System clipboard
-set clipboard=unnamed
-let mapleader = "<space>"
+set clipboard+=unnamedplus
+let mapleader = " "
 
+autocmd FileType tex,latex setlocal spell spelllang=en_us
+" Vertically center document when entering insert mode
+autocmd InsertEnter * norm zz
+
+" Remove  trailing whitespaces on save
+autocmd BufWritePre * %s/\s\+$//e
+
+" change spell heck to CZ on Z
+map <leader>z :setlocal spell! spelllang=cs<CR>
+
+" Enable folding
+set foldmethod=indent
+set foldlevel=99
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
+" in Insert mode jk is the same as ESC
+inoremap jk <esc>
+" remove highlight after search
+nnoremap ,<space> :nohlsearch<CR>
 
 call plug#begin('~/.vim/plugged')
 
-Plug 'morhetz/gruvbox'
+Plug 'bling/vim-airline'
 Plug 'mbbill/undotree'
 "Plug 'git@github.com:Valloric/YouCompleteMe.git'
 
@@ -28,7 +48,7 @@ let g:vimtex_compiler_latexmk.background = 1
 " let g:vimtex_compiler_latexmk.backend = 'jobs'
 
 if has('nvim')
-  let g:vimtex_quickfix_latexlog = {'fix_paths':0}
+  " let g:vimtex_quickfix_latexlog = {'fix_paths':0}
   let g:vimtex_compiler_progname = 'nvr'
 endif
 
@@ -45,6 +65,14 @@ else
   Plug 'roxma/nvim-yarp'
   Plug 'roxma/vim-hug-neovim-rpc'
 endif
+
+Plug 'neovim/nvim-lspconfig'
+Plug 'hrsh7th/nvim-cmp'
+Plug 'hrsh7th/cmp-nvim-lsp'
+Plug 'saadparwaiz1/cmp_luasnip'
+Plug 'L3MON4D3/LuaSnip'
+
+
 let g:deoplete#enable_at_startup = 1
 "call deoplete#custom#option('smart_case', v:true
 " deoplete tab-complete
@@ -65,14 +93,134 @@ nnoremap <c-x> :w<cr>
 "let g:UltiSnipsSnippetDirectories=["UltiSnips", "my_snippets"]
 
 " LaTex plugins
+"
+" jupyter plugin
+Plug 'jupyter-vim/jupyter-vim'
+if has('nvim')
+    let g:python3_host_prog = '/usr/bin/python3'
+else
+    set pyxversion=3
+
+    " OSX
+    set pythonthreedll=/Library/Frameworks/Python.framework/Versions/3.6/Python
+
+    " Windows
+    set pythonthreedll=python37.dll
+    set pythonthreehome=C:\Python37
+endif
+
+Plug 'morhetz/gruvbox'
 
 call plug#end()
+lua << EOF
+-- Set completeopt to have a better completion experience
+vim.o.completeopt = 'menuone,noselect'
 
-let mapleader = " "
+-- luasnip setup
+local luasnip = require 'luasnip'
+
+-- nvim-cmp setup
+local cmp = require 'cmp'
+cmp.setup {
+  completion = {
+    autocomplete = false
+  },
+  snippet = {
+    expand = function(args)
+      require('luasnip').lsp_expand(args.body)
+    end,
+  },
+  mapping = {
+    ['<C-p>'] = cmp.mapping.select_prev_item(),
+    ['<C-n>'] = cmp.mapping.select_next_item(),
+    ['<C-d>'] = cmp.mapping.scroll_docs(-4),
+    ['<C-f>'] = cmp.mapping.scroll_docs(4),
+    ['<C-Space>'] = cmp.mapping.complete(),
+    ['<C-e>'] = cmp.mapping.close(),
+    ['<CR>'] = cmp.mapping.confirm {
+      behavior = cmp.ConfirmBehavior.Replace,
+      select = true,
+    },
+    ['<Tab>'] = function(fallback)
+      if vim.fn.pumvisible() == 1 then
+        vim.fn.feedkeys(vim.api.nvim_replace_termcodes('<C-n>', true, true, true), 'n')
+      elseif luasnip.expand_or_jumpable() then
+        vim.fn.feedkeys(vim.api.nvim_replace_termcodes('<Plug>luasnip-expand-or-jump', true, true, true), '')
+      else
+        fallback()
+      end
+    end,
+    ['<S-Tab>'] = function(fallback)
+      if vim.fn.pumvisible() == 1 then
+        vim.fn.feedkeys(vim.api.nvim_replace_termcodes('<C-p>', true, true, true), 'n')
+      elseif luasnip.jumpable(-1) then
+        vim.fn.feedkeys(vim.api.nvim_replace_termcodes('<Plug>luasnip-jump-prev', true, true, true), '')
+      else
+        fallback()
+      end
+    end,
+  },
+  sources = {
+    { name = 'nvim_lsp' },
+    { name = 'luasnip' },
+  },
+}
+EOF
+
+
+lua << EOF
+local nvim_lsp = require('lspconfig')
+
+-- Use an on_attach function to only map the following keys
+-- after the language server attaches to the current buffer
+local on_attach = function(client, bufnr)
+
+  local function buf_set_keymap(...) vim.api.nvim_buf_set_keymap(bufnr, ...) end
+  local function buf_set_option(...) vim.api.nvim_buf_set_option(bufnr, ...) end
+
+  -- Enable completion triggered by <c-x><c-o>
+  buf_set_option('omnifunc', 'v:lua.vim.lsp.omnifunc')
+
+  -- Mappings.
+  local opts = { noremap=true, silent=true }
+
+  -- See `:help vim.lsp.*` for documentation on any of the below functions
+  buf_set_keymap('n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<CR>', opts)
+  buf_set_keymap('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<CR>', opts)
+  buf_set_keymap('n', 'K', '<cmd>lua vim.lsp.buf.hover()<CR>', opts)
+  buf_set_keymap('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', opts)
+  buf_set_keymap('n', '<C-k>', '<cmd>lua vim.lsp.buf.signature_help()<CR>', opts)
+  buf_set_keymap('n', '<space>wa', '<cmd>lua vim.lsp.buf.add_workspace_folder()<CR>', opts)
+  buf_set_keymap('n', '<space>wr', '<cmd>lua vim.lsp.buf.remove_workspace_folder()<CR>', opts)
+  buf_set_keymap('n', '<space>wl', '<cmd>lua print(vim.inspect(vim.lsp.buf.list_workspace_folders()))<CR>', opts)
+  buf_set_keymap('n', '<space>D', '<cmd>lua vim.lsp.buf.type_definition()<CR>', opts)
+  buf_set_keymap('n', '<space>rn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts)
+  buf_set_keymap('n', '<space>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
+  buf_set_keymap('n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
+  buf_set_keymap('n', '<space>e', '<cmd>lua vim.lsp.diagnostic.show_line_diagnostics()<CR>', opts)
+  buf_set_keymap('n', '[d', '<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>', opts)
+  buf_set_keymap('n', ']d', '<cmd>lua vim.lsp.diagnostic.goto_next()<CR>', opts)
+  buf_set_keymap('n', '<space>q', '<cmd>lua vim.lsp.diagnostic.set_loclist()<CR>', opts)
+  buf_set_keymap('n', '<space>f', '<cmd>lua vim.lsp.buf.formatting()<CR>', opts)
+
+end
+
+-- Use a loop to conveniently call 'setup' on multiple servers and
+-- map buffer local keybindings when the language server attaches
+-- Remove python, does not work well plus server is not closed after VIM is closed 'pyright',
+local servers = { 'rust_analyzer', 'hls' }
+for _, lsp in ipairs(servers) do
+  nvim_lsp[lsp].setup {
+    on_attach = on_attach,
+    flags = {
+      debounce_text_changes = 150,
+    }
+  }
+end
+EOF
 
 set nocompatible
 filetype off
-
 
 syntax on
 set noerrorbells
@@ -81,15 +229,18 @@ set hidden
 set noswapfile
 set nobackup
 
-set undodir=~/.vim/undodir
+" set undodir=~/.vim/undodir
 set undofile
 set nu relativenumber
 
 set wildmode=longest,list,full
 
-colorscheme gruvbox
 set background=dark
+set t_Co=256
+colorscheme gruvbox
+if (has('termguicolors'))
+	set termguicolors
+endif
+
 
 filetype plugin indent on
-
-autocmd BufWritePre * %s/\s\+$//e
