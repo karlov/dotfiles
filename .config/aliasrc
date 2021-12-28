@@ -1,0 +1,23 @@
+# ls
+alias ls='ls  --color=auto'
+alias ll='ls -lh'
+alias la='ls -A'
+alias l='ls -lhA'
+
+alias df='df -h'
+alias pa='ps aux'
+alias pu='pushd'
+# alias vim='vim -c "syntax on"'
+alias scpresume="rsync --partial --progress --rsh=ssh"
+alias v='nvim'
+alias vim='nvim'
+# dotnet
+alias bd='dotnet build --no-restore'
+
+# confirm before overwriting something
+alias cp="cp -i"
+alias mv='mv -i'
+alias rm='rm -i'
+
+# get error messages from journalctl
+alias jctl="journalctl -p 3 -xb"
